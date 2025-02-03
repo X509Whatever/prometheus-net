@@ -6,12 +6,12 @@ on:
   pull_request:
     branches: ["*"]
 
-env: []
+env: {}
 
 jobs:
   build:
     name: build
-    runs-on: windows-2019
+    runs-on: windows-2022
     permissions:
       contents: write
       packages: write
@@ -28,26 +28,33 @@ jobs:
           $runNumber = "${{ github.run_number }}"
           $commitHash = "${{ github.sha }}"
           $commitCount = (git rev-list --count HEAD)
-          $version = "1.1.$commitCount.$runNumber"
+          $version = "8.2.1.$commitCount"
+          $informationalVersion = "8.2.1.$commitCount+$runNumber-fork"
           $asipath = "Prometheus/Prometheus.csproj"
           echo "VERSION=$version" >> $env:GITHUB_ENV
           echo "COMMIT=$commitHash" >> $env:GITHUB_ENV
-          (Get-Content "$asipath") -replace '0\.0\.0\.0', "$version" | Set-Content "$asipath"
-          (Get-Content "$asipath") -replace 'GIT_COMMIT', "$commitHash" | Set-Content "$asipath"
+          (Get-Content "$asipath") -replace '0\.0\.0\.0', "$version" `
+                                   -replace 'GIT_COMMIT', "$commitHash" | Set-Content "$asipath"
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 7.0.x
 
-      - name: Restore dependencies
-        run: dotnet restore prometheus-net.sln
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1.3
+
+      - name: Restore dependencies (NuGet)
+        run: nuget restore prometheus-net.sln
 
       - name: Build
-        run: dotnet build prometheus-net.sln --configuration Release --no-restore /p:ApplicationVersion=%VERSION%
+        run: msbuild /t:Build /p:Configuration=Release /p:ApplicationVersion=%VERSION% prometheus-net.sln
+
+      - name: Pack NuGet packages
+        run: msbuild /t:Pack /p:Configuration=Release /p:ApplicationVersion=%VERSION% Prometheus/Prometheus.csproj
 
       - name: Publish artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
           path: |
