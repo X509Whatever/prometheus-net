@@ -1,8 +1,9 @@
 ﻿using System;
+using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
-using System.Threading.Tasks;
 
 namespace Prometheus.Tests
 {
@@ -57,7 +58,7 @@ namespace Prometheus.Tests
             histogram.Observe(1.9, exemplar);
 
             var serialized = await registry.CollectAndSerializeToStringAsync(ExpositionFormat.OpenMetricsText);
-            
+
             // We expect to see it there.
             StringAssert.Contains(serialized, canary);
 
@@ -101,6 +102,79 @@ namespace Prometheus.Tests
             // 3.0 bucket
             // +inf bucket
             await serializer.Received(requiredNumberOfCalls: 3).WriteMetricPointAsync(Arg.Any<byte[]>(), Arg.Any<byte[]>(), Arg.Any<CanonicalLabel>(), 2, Arg.Any<ObservedExemplar>(), Arg.Any<byte[]>(), Arg.Any<CancellationToken>());
+        }
+
+        [TestMethod]
+        public async Task Empty_Buckets_Are_Not_Serialized_Using_VmRange()
+        {
+            var registry = Metrics.NewCustomRegistry();
+            var factory = Metrics.WithCustomRegistry(registry);
+
+            var histogram = factory.CreateHistogram("xxx", "", new HistogramConfiguration
+            {
+                Buckets = new[] { 1.000, 2.000, 4.000 },
+                ExportAsVmRange = true,
+            });
+
+            histogram.Observe(2.0);
+            histogram.Observe(3.0);
+
+            // # HELP xxx 
+            // # TYPE xxx histogram
+            // xxx_sum 5
+            // xxx_count 2
+            // xxx_bucket{vmrange="1...2"} 1
+            // xxx_bucket{vmrange="2...4"} 1
+            var serialized = await registry.CollectAndSerializeToStringAsync(ExpositionFormat.PrometheusText);
+
+            var vmrangeLabels = Regex.Matches(serialized, @"^xxx_bucket{vmrange=.*", RegexOptions.Multiline);
+            Assert.AreEqual(vmrangeLabels.Count, 2);
+
+            var leLabels = Regex.Matches(serialized, @"^xxx_bucket{le=.*", RegexOptions.Multiline);
+            Assert.AreEqual(leLabels.Count, 0);
+        }
+
+        [TestMethod]
+        public async Task Serialized_Histogram_Is_Consistent_Using_VmRange()
+        {
+            var registry = Metrics.NewCustomRegistry();
+            var factory = Metrics.WithCustomRegistry(registry);
+
+            var histogram = factory.CreateHistogram("xxx", "", new HistogramConfiguration
+            {
+                Buckets = new[]
+                {
+                    0.001,
+                    0.005,
+                    0.025,
+                    0.050,
+                    0.100,
+                    0.250,
+                    0.500,
+                    1.000,
+                    2.000,
+                    4.000,
+                    8.000,
+                    16.00,
+                    32.00,
+                    128.0,
+                    256.0,
+                    1024,
+                    2048
+                },
+                ExportAsVmRange = true,
+            });
+
+            foreach (var value in Histogram.ExponentialBuckets(0.00001, 1.3, 100))
+                histogram.Observe(value);
+
+            var serialized = await registry.CollectAndSerializeToStringAsync(ExpositionFormat.PrometheusText);
+
+            var expectedLine = @"xxx_bucket{vmrange=""0...0.001""} 18";
+            StringAssert.Contains(serialized, expectedLine);
+
+            expectedLine = @"xxx_bucket{vmrange=""2048...1.79769313486232e+308""} 27";
+            StringAssert.Contains(serialized, expectedLine);
         }
 
         [TestMethod]

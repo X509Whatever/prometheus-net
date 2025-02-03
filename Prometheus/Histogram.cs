@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -32,8 +33,11 @@ public sealed class Histogram : Collector<Histogram.Child>, IHistogram
     private readonly CanonicalLabel[] _leLabels;
 
     private static readonly byte[] LeLabelName = "le"u8.ToArray();
+    private static readonly byte[] VmRangeLabelName = "vmrange"u8.ToArray();
 
-    internal Histogram(string name, string help, StringSequence instanceLabelNames, LabelSequence staticLabels, bool suppressInitialValue, double[]? buckets, ExemplarBehavior exemplarBehavior)
+    private readonly bool _exportAsVmRange;
+
+    internal Histogram(string name, string help, StringSequence instanceLabelNames, LabelSequence staticLabels, bool suppressInitialValue, double[]? buckets, bool exportAsVmRange, ExemplarBehavior exemplarBehavior)
         : base(name, help, instanceLabelNames, staticLabels, suppressInitialValue, exemplarBehavior)
     {
         if (instanceLabelNames.Contains("le"))
@@ -41,7 +45,13 @@ public sealed class Histogram : Collector<Histogram.Child>, IHistogram
             throw new ArgumentException("'le' is a reserved label name");
         }
 
+        if (instanceLabelNames.Contains("vmrange"))
+        {
+            throw new ArgumentException("'vmrange' is a reserved label name");
+        }
+
         _buckets = buckets ?? DefaultBuckets;
+        _exportAsVmRange = exportAsVmRange;
 
         if (_buckets.Length == 0)
         {
@@ -64,7 +74,9 @@ public sealed class Histogram : Collector<Histogram.Child>, IHistogram
         _leLabels = new CanonicalLabel[_buckets.Length];
         for (var i = 0; i < _buckets.Length; i++)
         {
-            _leLabels[i] = TextSerializer.EncodeValueAsCanonicalLabel(LeLabelName, _buckets[i]);
+            _leLabels[i] = _exportAsVmRange
+                ? EncodeValueAsVmRangeLabel(min: (i > 0) ? _buckets[i - 1] : 0, max: _buckets[i])
+                : TextSerializer.EncodeValueAsCanonicalLabel(LeLabelName, _buckets[i]);
         }
 
 #if NET7_0_OR_GREATER
@@ -91,6 +103,18 @@ public sealed class Histogram : Collector<Histogram.Child>, IHistogram
             _bucketsAlignmentBuffer = [];
         }
 #endif
+    }
+
+    private static CanonicalLabel EncodeValueAsVmRangeLabel(double min, double max)
+    {
+        if (double.IsPositiveInfinity(max))
+            max = double.MaxValue;
+
+        var valueAsString = $"{min.ToString("g", CultureInfo.InvariantCulture)}...{max.ToString("g", CultureInfo.InvariantCulture)}";
+        var prometheusBytes = PrometheusConstants.ExportEncoding.GetBytes(valueAsString);
+
+        // OpenMetrics does not support vmrange, so the same value is used for both.
+        return new CanonicalLabel(VmRangeLabelName, prometheusBytes, prometheusBytes);
     }
 
     private protected override Child NewChild(LabelSequence instanceLabels, LabelSequence flattenedLabels, bool publish, ExemplarBehavior exemplarBehavior)
@@ -150,17 +174,24 @@ public sealed class Histogram : Collector<Histogram.Child>, IHistogram
                 cancel);
 
             var cumulativeCount = 0L;
+            var exportAsVmRange = Parent._exportAsVmRange;
 
             for (var i = 0; i < _bucketCounts.Length; i++)
             {
+                var bucketValue = _bucketCounts[i].Value;
+
+                if (!exportAsVmRange)
+                    cumulativeCount += bucketValue;
+                else if (bucketValue == 0)
+                    continue; //< Do not serialize empty buckets using vmrange.
+
                 var exemplar = BorrowExemplar(ref _exemplars[i]);
 
-                cumulativeCount += _bucketCounts[i].Value;
                 await serializer.WriteMetricPointAsync(
                     Parent.NameBytes,
                     FlattenedLabelsBytes,
                     Parent._leLabels[i],
-                    cumulativeCount,
+                    exportAsVmRange ? bucketValue : cumulativeCount,
                     exemplar,
                     BucketSuffix,
                     cancel);

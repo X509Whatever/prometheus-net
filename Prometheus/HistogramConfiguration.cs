@@ -14,4 +14,10 @@ public sealed class HistogramConfiguration : MetricConfiguration
     /// If null, inherits the exemplar behavior from the metric factory.
     /// </summary>
     public ExemplarBehavior? ExemplarBehavior { get; set; }
+
+    /// <summary>
+    /// Allows you to configure how the histogram is exported, using the vmrange label
+    /// instead of le label with cumulative values.
+    /// </summary>
+    public bool ExportAsVmRange { get; set; }
 }
