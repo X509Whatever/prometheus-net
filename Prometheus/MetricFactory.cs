@@ -119,7 +119,7 @@ public sealed class MetricFactory : IMetricFactory
 
     private static Gauge CreateGaugeInstance(string Name, string Help, in StringSequence InstanceLabelNames, in LabelSequence StaticLabels, GaugeConfiguration Configuration, ExemplarBehavior ExemplarBehavior) => new(Name, Help, InstanceLabelNames, StaticLabels, Configuration.SuppressInitialValue, ExemplarBehavior);
 
-    private static Histogram CreateHistogramInstance(string Name, string Help, in StringSequence InstanceLabelNames, in LabelSequence StaticLabels, HistogramConfiguration Configuration, ExemplarBehavior ExemplarBehavior) => new(Name, Help, InstanceLabelNames, StaticLabels, Configuration.SuppressInitialValue, Configuration.Buckets, ExemplarBehavior);
+    private static Histogram CreateHistogramInstance(string Name, string Help, in StringSequence InstanceLabelNames, in LabelSequence StaticLabels, HistogramConfiguration Configuration, ExemplarBehavior ExemplarBehavior) => new(Name, Help, InstanceLabelNames, StaticLabels, Configuration.SuppressInitialValue, Configuration.Buckets, Configuration.ExportAsVmRange, ExemplarBehavior);
 
     private static Summary CreateSummaryInstance(string name, string help, in StringSequence instanceLabelNames, in LabelSequence staticLabels, SummaryConfiguration configuration, ExemplarBehavior exemplarBehavior) => new(name, help, instanceLabelNames, staticLabels, exemplarBehavior, configuration.SuppressInitialValue,
             configuration.Objectives, configuration.MaxAge, configuration.AgeBuckets, configuration.BufferSize);
