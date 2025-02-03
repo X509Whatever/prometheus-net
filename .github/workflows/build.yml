@@ -1,0 +1,73 @@
+name: Build
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+    branches: ["*"]
+
+env: []
+
+jobs:
+  build:
+    name: build
+    runs-on: windows-2019
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set Versiona
+        id: version
+        shell: pwsh
+        run: |
+          $runNumber = "${{ github.run_number }}"
+          $commitHash = "${{ github.sha }}"
+          $commitCount = (git rev-list --count HEAD)
+          $version = "1.1.$commitCount.$runNumber"
+          $asipath = "Prometheus/Prometheus.csproj"
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+          echo "COMMIT=$commitHash" >> $env:GITHUB_ENV
+          (Get-Content "$asipath") -replace '0\.0\.0\.0', "$version" | Set-Content "$asipath"
+          (Get-Content "$asipath") -replace 'GIT_COMMIT', "$commitHash" | Set-Content "$asipath"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore prometheus-net.sln
+
+      - name: Build
+        run: dotnet build prometheus-net.sln --configuration Release --no-restore /p:ApplicationVersion=%VERSION%
+
+      - name: Publish artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: |
+            Prometheus/bin/Release/*.nupkg
+
+      - name: Collect artifacts
+        run: |
+          mkdir artifacts
+          cp Prometheus/bin/Release/*.nupkg artifacts/
+
+      - name: Draft release
+        if: github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191  # v2.0.8
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: v${{ env.VERSION }}
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          files: |
+            artifacts/*
+          draft: true
+
