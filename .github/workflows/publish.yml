@@ -15,7 +15,7 @@ jobs:
         run: |
           gh release download "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
-            --pattern "*.nuget" \
+            --pattern "*.nupkg" \
             --dir "assets"
 
       - name: Publish 
