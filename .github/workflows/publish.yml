@@ -1,0 +1,28 @@
+name: Publish NuGet Package
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    steps:
+      - name: Download release asset
+        run: |
+          gh release download "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "*.nuget" \
+            --dir "assets"
+
+      - name: Publish 
+        uses: EasyDesk/job-nuget-library-deploy@v1
+        with:
+          # (Required) The dotnet version version to be used.
+          dotnet-version: '8.x'
+
+          # (Required) The API key used to authenticate the upload of the package.
+          # Can be generated via the NuGet portal.
+          nuget-api-key: ${{ secrets.NUGET_APIKEY }}
+
+          publish-dir: assets
+
