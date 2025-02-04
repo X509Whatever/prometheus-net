@@ -40,16 +40,13 @@
 		<EmbedUntrackedSources>true</EmbedUntrackedSources>
 
 		<!-- NuGet packaging config -->
-		<PackageId>prometheus-net</PackageId>
-		<Authors>andrasm,qed-,lakario,sandersaares</Authors>
-		<Company>prometheus-net</Company>
-		<Product>prometheus-net</Product>
-		<Description>.NET client library for the Prometheus monitoring and alerting system</Description>
-		<Copyright>Copyright © prometheus-net developers</Copyright>
-		<PackageProjectUrl>https://github.com/prometheus-net/prometheus-net</PackageProjectUrl>
-		<PackageIcon>prometheus-net-logo.png</PackageIcon>
+		<PackageId>VictoriaMetrics.Net</PackageId>
+		<Authors>pruiz,x509whatever</Authors>
+		<Product>VictoriaMetrics.Net (unofficial prometheus-net fork)</Product>
+		<Description>A community-maintained fork of prometheus-net with additional VictoriaMetrics features</Description>
+		<PackageProjectUrl>https://github.com/pruiz/prometheus-net</PackageProjectUrl>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
-		<PackageTags>metrics prometheus</PackageTags>
+		<PackageTags>metrics prometheus victoriametrics</PackageTags>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<IncludeSymbols>True</IncludeSymbols>
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
