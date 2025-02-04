@@ -28,7 +28,7 @@ jobs:
           $runNumber = "${{ github.run_number }}"
           $commitHash = "${{ github.sha }}"
           $commitCount = (git rev-list --count HEAD)
-          $version = "8.2.1.$commitCount"
+          $version = "8.2.1.$runNumber"
           $informationalVersion = "8.2.1.$commitCount+$runNumber-fork"
           $asipath = "Prometheus/Prometheus.csproj"
           echo "VERSION=$version" >> $env:GITHUB_ENV
